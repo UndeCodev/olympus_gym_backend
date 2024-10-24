@@ -2,9 +2,8 @@ import { isPasswordPwned } from "../utils/passwordHelper.js";
 
 export const checkPassword = async (req, res) => {
   const { password } = req.body;
-  try {
-    console.log(req.body);
-    
+  
+  try {    
     if (!password) {
       return res.status(400).json({ message: "Password is required" });
     }
