@@ -29,7 +29,7 @@ router.post("/mfa/verify", mfaVerify);
 router.put("/change-password", changePassword);
 
 // verify an email
-router.get("/verify-email", verifyEmail);
+router.put("/verify-email", verifyEmail);
 
 // resend a verification email
 router.post("/resend-verification-email", resendVerificationEmail);

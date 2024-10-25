@@ -13,6 +13,21 @@ export const getTermsAndConditions = async (req, res) => {
   }
 };
 
+export const getTermsEnable = async (req, res) => {
+  try {
+    const termsAndConditions = await prisma.termsAndConditions.findFirst({
+      where: { status: 'vigente' }
+    });
+    res.status(200).json(termsAndConditions);
+  } catch (error) {
+    console.log(error);
+    res
+      .status(500)
+      .json({ message: "Error al obtener las políticas de privacidad" });
+  }
+};
+
+
 export const createTermsAndConditions = async (req, res) => {
   const { title, content, effectiveDate } = req.body;
 

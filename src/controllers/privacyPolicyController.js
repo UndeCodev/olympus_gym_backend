@@ -9,9 +9,24 @@ export const getPrivacyPolicies = async (req, res) => {
     });
     res.status(200).json(privacyPolicies);
   } catch (error) {
+    console.log(error);
     res
       .status(500)
-      .json({ error: "Error al obtener las políticas de privacidad" });
+      .json({ message: "Error al obtener las políticas de privacidad" });
+  }
+};
+
+export const getPrivacyEnable = async (req, res) => {
+  try {
+    const privacyPolicy = await prisma.privacyPolicy.findFirst({
+      where: { status: 'vigente' }
+    });
+    res.status(200).json(privacyPolicy);
+  } catch (error) {
+    console.log(error);
+    res
+      .status(500)
+      .json({ message: "Error al obtener las políticas de privacidad" });
   }
 };
 

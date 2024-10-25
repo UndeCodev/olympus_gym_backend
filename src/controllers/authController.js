@@ -62,7 +62,7 @@ export const registerUser = async (req, res) => {
     const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: 900 });
 
     // Enviar correo de verificación
-    const verificationLink = `${BASE_URL}/auth/verify-email?token=${token}`;
+    const verificationLink = `${BASE_URL}/auth/verificar-email/?token=${token}&email=${email}`;
 
     const htmlContent = `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
@@ -237,10 +237,12 @@ export const loginUser = async (req, res) => {
 };
 
 export const verifyEmail = async (req, res) => {
-  const { token } = req.query;
+  const { token } = req.body;
 
   if (!token) {
-    return res.status(400).send("No se proporcionó ningún token.");
+    return res.status(400).json({
+      message: 'No se proporcionó ningún token'
+    })
   }
 
   try {
@@ -255,6 +257,13 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).send("Usuario no encontrado.");
     }
 
+    if (user.isEmailVerified) {
+      return res.status(400).json({ 
+        message: "El usuario ya está verificado, ya puedes iniciar sesión", 
+        isEmailVerified: true
+      });
+    }
+
     await prisma.usuario.update({
       where: { email: decoded.email },
       data: {
@@ -262,9 +271,12 @@ export const verifyEmail = async (req, res) => {
       },
     });
 
-    res.send("Correo verificado exitosamente. Ya puedes iniciar sesión.");
+    return res.sendStatus(200);
   } catch (error) {
-    res.status(400).send("Token inválido o expirado.");
+    console.log(error);
+    return res.status(400).send({
+      message: "Token inválido o expirado."
+    });
   }
 };
 
@@ -354,7 +366,6 @@ export const verifyToken = (req, res, next) => {
       { expiresIn: 18000 } // 5h
     );
 
-    // next(); // Continuar con la solicitud
     return res.status(200).json({
       user: decoded.user,
       token: newToken,
@@ -369,9 +380,13 @@ export const verifyToken = (req, res, next) => {
 };
 
 export const resendVerificationEmail = async (req, res) => {
-  try {
-    const { email } = req.body;
+  const { email } = req.body;
 
+  if (!email) {
+    return res.status(404).json({ message: "No se proporcionó el correo electrónico" });
+  }
+  
+  try {
     // Verifica si el usuario existe y si ya está verificado
     const user = await prisma.usuario.findUnique({ where: { email } });
 
@@ -380,14 +395,17 @@ export const resendVerificationEmail = async (req, res) => {
     }
 
     if (user.isEmailVerified) {
-      return res.status(400).json({ message: "El usuario ya está verificado" });
+      return res.status(400).json({ 
+        message: "El usuario ya está verificado, ya puedes iniciar sesión", 
+        isEmailVerified: true
+      });
     }
 
     // Implementar JWT
     const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: 900 });
 
     // Enviar correo de verificación
-    const verificationLink = `${BASE_URL}/auth/verify-email?token=${token}`;
+    const verificationLink = `${BASE_URL}/auth/verificar-email/?token=${token}&email=${email}`;
     const htmlContent = `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
     <h2 style="color: #333;">¡Hola ${user.nombre || "Usuario"}!</h2>
@@ -600,7 +618,7 @@ export const sendPasswordResetInstructions = async (req, res) => {
   } catch (error) {
     console.log(error);
     return res.status(400).json({
-      message: "Algo salió mal",
+      message: "Algo salió mal, inténtalo de nuevo más tarde.",
     });
   }
 };

@@ -9,7 +9,21 @@ export const getLegalDisclaimer = async (req, res) => {
     });
     res.status(200).json(legalDisclaimer);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener el descargo legal" });
+    res.status(500).json({ message: "Error al obtener el descargo legal" });
+  }
+};
+
+export const getLegalDisclaimerEnable = async (req, res) => {
+  try {
+    const privacyPolicy = await prisma.legalDisclaimer.findFirst({
+      where: { status: 'vigente' }
+    });
+    res.status(200).json(privacyPolicy);
+  } catch (error) {
+    console.log(error);
+    res
+      .status(500)
+      .json({ message: "Error al obtener las políticas de privacidad" });
   }
 };
 
