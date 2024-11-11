@@ -21,7 +21,7 @@ app.use("/settings", companyProfileRoutes);
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
-  console.log(`Servidor ejecutándose en el puerto ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
 
 export default app

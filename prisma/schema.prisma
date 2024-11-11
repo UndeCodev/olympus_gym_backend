@@ -1,7 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,81 +11,99 @@ datasource db {
 }
 
 model Usuario {
-  id                String   @id @default(uuid()) // UUID en Prisma es de tipo String
-  nombre            String
-  apellidos         String
-  telefono          String
-  email             String   @unique
-  password          String
-  fechaNacimiento   DateTime?
-  rol               String   @default("user")
-  hasMFA            Boolean  @default(false)
-  isEmailVerified   Boolean  @default(false)
-  failedLoginAttempts Int?    @default(0)
-  isLocked          Boolean  @default(false)
-  lockTime          BigInt?
-  lastAttempt       DateTime?
+  id                          Int                           @id @default(autoincrement())
+  nombre                      String
+  apellidos                   String
+  telefono                    String
+  fecha_nacimiento            DateTime
+  email                       String                        @unique
+  contrasena                  String
+  rol                         Int                           @default(3) //User
+  UsuariosConfiguracionCuenta UsuariosConfiguracionCuenta[]
+  UsuariosRegistroActividad   UsuariosRegistroActividad[]
 
   @@map("usuarios") // Mapea a la tabla "usuarios" en la base de datos
 }
 
-model user_activity_log {
-  id            Int      @id @default(autoincrement())
-  user_id       String
-  activity_type String
-  activity_time DateTime @default(now())
+model UsuariosConfiguracionCuenta {
+  id                              Int       @id @default(autoincrement())
+  usuario_id                      Int
+  usuario                         Usuario   @relation(fields: [usuario_id], references: [id])
+  email_verificado                Boolean   @default(false)
+  autenticacion_doble_factor      Boolean   @default(false)
+  intentos_fallidos_inicio_sesion Int       @default(0)
+  cuenta_bloqueada                Boolean   @default(false)
+  tiempo_bloqueo                  BigInt?
+  ultimo_intento_acceso           DateTime?
+
+  @@map("usuarios_configuracion_cuenta")
 }
 
+enum TipoActividad {
+  INICIO_SESION    @map("Inicio de sesión")
+  CUENTA_BLOQUEADA  @map("Cuenta bloqueada")
+  CAMBIO_CONTRASENA @map("Cambio de contraseña")
+}
+
+model UsuariosRegistroActividad {
+  id              Int      @id @default(autoincrement())
+  usuario_id      Int
+  usuario         Usuario   @relation(fields: [usuario_id], references: [id])
+  tipo_actividad  TipoActividad
+  fecha           DateTime @default(now())
+
+  @@map("usuarios_registro_actividad")
+}
 
 model PrivacyPolicy {
-  id           Int       @id @default(autoincrement())
-  title        String
-  content      String
+  id            Int       @id @default(autoincrement())
+  title         String
+  content       String
   effectiveDate DateTime
-  createdAt    DateTime?
-  updatedAt    DateTime?  
-  version      Float?
-  status       String    @default("vigente") // Nuevo campo para el estado
+  createdAt     DateTime?
+  updatedAt     DateTime?
+  version       Float?
+  status        String    @default("vigente") // Nuevo campo para el estado
 }
 
 model TermsAndConditions {
-  id           Int       @id @default(autoincrement())
-  title        String
-  content      String
+  id            Int       @id @default(autoincrement())
+  title         String
+  content       String
   effectiveDate DateTime
-  createdAt    DateTime?
-  updatedAt    DateTime?  
-  version      Float?
-  status       String    @default("vigente") // Nuevo campo para el estado
+  createdAt     DateTime?
+  updatedAt     DateTime?
+  version       Float?
+  status        String    @default("vigente") // Nuevo campo para el estado
 }
 
 model LegalDisclaimer {
-  id           Int       @id @default(autoincrement())
-  title        String
-  content      String
+  id            Int       @id @default(autoincrement())
+  title         String
+  content       String
   effectiveDate DateTime
-  createdAt    DateTime?
-  updatedAt    DateTime?  
-  version      Float?
-  status       String    @default("vigente") // Nuevo campo para el estado
+  createdAt     DateTime?
+  updatedAt     DateTime?
+  version       Float?
+  status        String    @default("vigente") // Nuevo campo para el estado
 }
 
 model CompanyProfile {
-  id             Int      @id @default(autoincrement())
-  logo_url        String   @map("logo_url") @db.VarChar(500) 
-  thumbnail_logo_url String? @map("thumbnail_logo_url") @db.VarChar(500) 
-  page_title      String   @map("page_title") @db.VarChar(60) 
-  slogan         String   @map("slogan") @db.VarChar(100) 
-  address        String   @map("address") @db.VarChar(255) 
-  city           String   @map("city") @db.VarChar(100) 
-  state          String   @map("state") @db.VarChar(100) 
-  postal_code     String   @map("postal_code") @db.VarChar(10) 
-  country        String   @default("México") @map("country") @db.VarChar(100) 
-  email          String   @map("email") @db.VarChar(255) 
-  phone_number    String   @map("phone_number") @db.VarChar(10) 
-  social         Json?    @map("social") 
-  created_at      DateTime @default(now()) @map("created_at") 
-  updated_at      DateTime @updatedAt @map("updated_at") 
-  @@map("companyProfile") 
-}
+  id                 Int      @id @default(autoincrement())
+  logo_url           String   @map("logo_url") @db.VarChar(500)
+  thumbnail_logo_url String?  @map("thumbnail_logo_url") @db.VarChar(500)
+  page_title         String   @map("page_title") @db.VarChar(60)
+  slogan             String   @map("slogan") @db.VarChar(100)
+  address            String   @map("address") @db.VarChar(255)
+  city               String   @map("city") @db.VarChar(100)
+  state              String   @map("state") @db.VarChar(100)
+  postal_code        String   @map("postal_code") @db.VarChar(10)
+  country            String   @default("México") @map("country") @db.VarChar(100)
+  email              String   @map("email") @db.VarChar(255)
+  phone_number       String   @map("phone_number") @db.VarChar(10)
+  social             Json?    @map("social")
+  created_at         DateTime @default(now()) @map("created_at")
+  updated_at         DateTime @updatedAt @map("updated_at")
 
+  @@map("companyProfile")
+}

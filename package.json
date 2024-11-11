@@ -25,6 +25,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "express-fileupload": "^1.5.1",
+    "express-validator": "^7.2.0",
     "fs-extra": "^11.2.0",
     "imagekit": "^5.2.0",
     "jsonwebtoken": "^9.0.2",
@@ -32,11 +33,13 @@
     "nodemailer": "^6.9.15",
     "nodemon": "^3.1.7",
     "otplib": "^12.0.1",
-    "prisma": "^5.21.1",
     "qrcode": "^1.5.4",
     "sequelize": "^6.37.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3",
     "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   }
 }

@@ -15,10 +15,13 @@ import {
 } from "../controllers/authController.js";
 import { checkPassword } from '../controllers/passwordController.js';
 
+import { validateRequest } from '../middlewares/validateRequest.js';
+import { userLoginValidation, userRegistrationValidation } from "../validations/userValidation.js";
+
 const router = Router();
 
-router.post("/login", loginUser);
-router.post("/register", registerUser);
+router.post("/login", userLoginValidation, validateRequest, loginUser);
+router.post("/register", userRegistrationValidation, validateRequest, registerUser);
 router.post("/mfa/setup", mfaSetup);
 router.put("/mfa/enable", enableMFA);
 router.post("/mfa/verify", mfaVerify);
