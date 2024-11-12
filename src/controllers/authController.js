@@ -15,7 +15,7 @@ import {
 
 const prisma = new PrismaClient();
 
-import { loginAttempts, verifyAccountStatus } from "../services/authService.js";
+import { loginAttempts, sendEmailByType, verifyAccountStatus } from "../services/authService.js";
 import { sendVerificationEmail } from "../utils/emailSender.js";
 
 export const registerUser = async (req, res) => {
@@ -383,48 +383,62 @@ export const resendVerificationEmail = async (req, res) => {
   }
 
   try {
-    // Verifica si el usuario existe y si ya está verificado
-    const user = await prisma.usuario.findUnique({ where: { email } });
+    // Verify user exits
+    const { id: user_id, nombre} = await prisma.usuario.findUnique({ 
+      where: { email },
+      select: {
+        id: true,
+        nombre: true
+      } 
+    });
 
-    if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+    if (!user_id) {
+      return res.status(404).json({ message: "Hubo un problema al encontrar el usuario, vuelve a intentarlo más tarde." });
     }
 
-    if (user.isEmailVerified) {
+    const { email_verificado } = await prisma.usuariosConfiguracionCuenta.findFirst({
+      where: { usuario_id: user_id },
+      select: {
+        email_verificado: true
+      }
+    }) 
+
+    if (email_verificado) {
       return res.status(400).json({
         message: "El usuario ya está verificado, ya puedes iniciar sesión",
         isEmailVerified: true,
       });
     }
 
-    // Implementar JWT
+    // Create token signed for verify email
     const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: 900 });
 
-    // Enviar correo de verificación
+    // URL to verify account
     const verificationLink = `${BASE_URL}/auth/verificar-email/?token=${token}&email=${email}`;
+
     const htmlContent = `
-  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
-    <h2 style="color: #333;">¡Hola ${user.nombre || "Usuario"}!</h2>
-    <p style="color: #333; font-size: 16px;">
-      Gracias por registrarte en <strong>Olympus GYM</strong>. Por favor, verifica tu correo electrónico haciendo clic en el enlace de abajo.
-    </p>
-    <p style="text-align: center;">
-      <a href="${verificationLink}" 
-         style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
-         Verificar correo
-      </a>
-    </p>
-    <p style="color: #333; font-size: 16px;">
-      Tienes 15 minutos para completar la verificación antes de que tu token expire.
-    </p>
-    <p style="color: #333; font-size: 16px;">
-      Si no solicitaste esta verificación, simplemente ignora este mensaje.
-    </p>
-    <p style="color: #555; font-size: 14px; text-align: center;">
-      © 2024 Olympus GYM. Todos los derechos reservados.
-    </p>
-  </div>
-`;
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
+        <h2 style="color: #333;">¡Hola ${nombre || "Usuario"}!</h2>
+        <p style="color: #333; font-size: 16px;">
+          Gracias por registrarte en <strong>Olympus GYM</strong>. Por favor, verifica tu correo electrónico haciendo clic en el enlace de abajo.
+        </p>
+        <p style="text-align: center;">
+          <a href="${verificationLink}" 
+             style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
+             Verificar correo
+          </a>
+        </p>
+        <p style="color: #333; font-size: 16px;">
+          Tienes 15 minutos para completar la verificación antes de que tu token expire.
+        </p>
+        <p style="color: #333; font-size: 16px;">
+          Si no solicitaste esta verificación, simplemente ignora este mensaje.
+        </p>
+        <p style="color: #555; font-size: 14px; text-align: center;">
+          © 2024 Olympus GYM. Todos los derechos reservados.
+        </p>
+      </div>
+    `;
 
     const isEmailSent = await sendVerificationEmail(
       email,
@@ -435,14 +449,14 @@ export const resendVerificationEmail = async (req, res) => {
     if (!isEmailSent) {
       return res
         .status(500)
-        .json({ message: "Error al enviar el correo de verificación" });
+        .json({ message: "Hubo un problema al enviar el correo de verificación" });
     }
 
     return res
       .status(200)
-      .json({ message: "Correo de verificación reenviado" });
+      .json({ message: "Correo de verificación reenviado correctamente." });
   } catch (error) {
-    console.error("Error al reenviar el correo de verificación: ", error);
+    console.log(error);
     return res.status(500).json({ message: "Error al reenviar el correo" });
   }
 };
@@ -550,14 +564,20 @@ export const resetPassword = async (req, res) => {
 export const sendPasswordResetInstructions = async (req, res) => {
   const { email } = req.body;
 
-  try {
-    if (!email) {
-      return res.status(400).json({
-        message: `Todos los campos son necesarios.`,
-      });
-    }
+  if (!email) {
+    return res.status(400).json({
+      message: `El campo email es obligatorio.`,
+    });
+  }
 
-    const userFound = await prisma.usuario.findUnique({ where: { email } });
+  try {
+    const userFound = await prisma.usuario.findUnique({ 
+      where: { email },
+      select: {
+        id: true,
+        nombre: true,
+      } 
+    });
 
     if (!userFound) {
       return res.status(404).json({
@@ -565,41 +585,14 @@ export const sendPasswordResetInstructions = async (req, res) => {
       });
     }
 
-    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: 900 });
+    const isEmailDispatched = await sendEmailByType(email, 'Verificar correo electrónico', {
+      username: userFound.nombre,
+      message: 'Recibimos una solicitud para restablecer tu contraseña. Haz clic en el enlace de abajo para establecer una nueva contraseña',
+      btnText: 'Restablecer contraseña',
+      expirationMessage: '15 minutos'
+    })
 
-    // Enviar correo de verificación
-    const verificationLink = `${BASE_URL}/auth/restablecer-contrasena?token=${token}`;
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
-        <h2 style="color: #333;">¡Hola ${userFound.nombre || "Usuario"}!</h2>
-        <p style="color: #333; font-size: 16px;">
-          Recibimos una solicitud para restablecer tu contraseña de <strong>Olympus GYM</strong>. Haz clic en el enlace de abajo para establecer una nueva contraseña.
-        </p>
-        <p style="text-align: center;">
-          <a href="${verificationLink}" 
-             style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
-             Restablecer contraseña
-          </a>
-        </p>
-        <p style="color: #333; font-size: 16px;">
-          Este enlace será válido durante los próximos 15 minutos. Si no restableces tu contraseña dentro de este tiempo, tendrás que solicitar un nuevo enlace.
-        </p>
-        <p style="color: #333; font-size: 16px;">
-          Si no solicitaste un restablecimiento de contraseña, ignora este correo.
-        </p>
-        <p style="color: #555; font-size: 14px; text-align: center;">
-          © 2024 Olympus GYM. Todos los derechos reservados.
-        </p>
-      </div>
-    `;
-
-    const isEmailSent = await sendVerificationEmail(
-      email,
-      "Instrucciones para restablecer tu contraseña en Olympus GYM",
-      htmlContent
-    );
-
-    if (!isEmailSent) {
+    if (!isEmailDispatched) {
       return res.status(500).json({
         message:
           "Error al enviar el correo electrónico, intenta de nuevo más tarde.",
@@ -609,7 +602,6 @@ export const sendPasswordResetInstructions = async (req, res) => {
     return res.status(200).json({
       message:
         "Las instrucciones han sido enviadas a tu correo electrónico, por favor revisa tu bandeja de entrada.",
-      link: verificationLink,
     });
   } catch (error) {
     console.log(error);

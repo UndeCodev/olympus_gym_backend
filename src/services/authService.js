@@ -1,4 +1,8 @@
+import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
+import { BASE_URL, JWT_SECRET } from "../utils/config.js";
+import { sendVerificationEmail } from "../utils/emailSender.js";
+
 const prisma = new PrismaClient();
 
 export const checkAccountStatus = async (userId) => {
@@ -130,3 +134,46 @@ export const verifyAccountStatus = async (userId) => {
     };
   }
 };
+
+
+export const sendEmailByType = async(email, subject, {
+  greeting,
+  username,
+  message,
+  btnText,
+  expirationTime,
+}) => {
+  // Create token with 15 min. to expiry
+  const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: 900 }); // 15 min to expire
+  
+  const verificationLink = `${BASE_URL}/auth/verificar-email/?token=${token}&email=${email}`;
+  
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
+      <h2 style="color: #333;">${greeting || '¡Hola!'} ${username || ''}</h2>
+      <p style="color: #333; font-size: 16px;">
+          ${message || 'Gracias por registrarte. Por favor, verifica tu correo electrónico haciendo clic en el enlace de abajo.'}
+      </p>
+      <p style="text-align: center;">
+          <a href="${verificationLink}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
+            ${btnText || 'Verificar correo'}
+          </a>
+      </p>
+      <p style="color: #333; font-size: 16px;">
+          Tienes ${expirationTime} para completar la verificación antes de que tu token expire.
+      </p>
+      <p style="color: #555; font-size: 14px; text-align: center;">
+          © 2024 Olympus GYM. Todos los derechos reservados.
+      </p>
+    </div>
+  `;
+  
+  const isEmailSend = await sendVerificationEmail(
+    email,
+    subject,
+    htmlContent
+  );
+
+
+  return isEmailSend
+}
