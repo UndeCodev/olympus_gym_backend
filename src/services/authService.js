@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import { BASE_URL, JWT_SECRET } from "../utils/config.js";
-import { sendVerificationEmail } from "../utils/emailSender.js";
+import { sendEmail } from "../utils/emailSender.js";
 
 const prisma = new PrismaClient();
 
@@ -135,45 +135,58 @@ export const verifyAccountStatus = async (userId) => {
   }
 };
 
+export const sendEmailByType = async(username, email, typeEmail) => {  
+  const routesAllowed = {
+    RESTABLECER_CONTRASENA: 'restablecer-contrasena',
+    REGISTRO_USUARIO: 'verificar-email',
+    REENVIO_VERIFICACION_EMAIL: 'verificar-email' 
+  }
 
-export const sendEmailByType = async(email, subject, {
-  greeting,
-  username,
-  message,
-  btnText,
-  expirationTime,
-}) => {
-  // Create token with 15 min. to expiry
-  const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: 900 }); // 15 min to expire
+  const emailConfig = await prisma.emailConfigurations.findFirst({
+    where: { tipo_email: typeEmail }  
+  });
+
+  const { tiempo_expiracion } = emailConfig
+
+  // Create a token signed with time to expire
+  const timeToExpireInSeconds = tiempo_expiracion * 60;
+  const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: timeToExpireInSeconds }); // 15 min default
   
-  const verificationLink = `${BASE_URL}/auth/verificar-email/?token=${token}&email=${email}`;
-  
+  // Time format to show
+  const timeToExpireMinutesOrHours = tiempo_expiracion >= 60 ? tiempo_expiracion / 60 : tiempo_expiracion;
+  const formatTimeToExpire = tiempo_expiracion >= 60 ? `horas` : 'minutos'; 
+
+  const routeByTypeEmail = routesAllowed[emailConfig.tipo_email] || routesAllowed.REGISTRO_USUARIO;  
+  const verificationLink = `${BASE_URL}/auth/${routeByTypeEmail}/?token=${token}`;
+
+  // Email content
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
-      <h2 style="color: #333;">${greeting || '¡Hola!'} ${username || ''}</h2>
+      <h2 style="color: #333;">${emailConfig.saludo || '¡Hola!'} ${username || ''}</h2>
       <p style="color: #333; font-size: 16px;">
-          ${message || 'Gracias por registrarte. Por favor, verifica tu correo electrónico haciendo clic en el enlace de abajo.'}
+          ${emailConfig.mensaje || 'Gracias por registrarte. Por favor, verifica tu correo electrónico haciendo clic en el enlace de abajo.'}
       </p>
       <p style="text-align: center;">
           <a href="${verificationLink}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
-            ${btnText || 'Verificar correo'}
+            ${emailConfig.texto_boton || 'Verificar correo'}
           </a>
       </p>
       <p style="color: #333; font-size: 16px;">
-          Tienes ${expirationTime} para completar la verificación antes de que tu token expire.
+          Tienes ${timeToExpireMinutesOrHours} ${formatTimeToExpire} para completar la verificación antes de que tu token expire.
       </p>
       <p style="color: #555; font-size: 14px; text-align: center;">
           © 2024 Olympus GYM. Todos los derechos reservados.
       </p>
     </div>
   `;
+
+  const subject = emailConfig.asunto;
   
-  const isEmailSend = await sendVerificationEmail(
+  const isEmailSent = await sendEmail(
     email,
     subject,
     htmlContent
   );
 
-
-  return isEmailSend
+  return isEmailSent;
 }

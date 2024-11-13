@@ -1,9 +1,9 @@
 import transporter from "../config/nodemailer.js";
 import { EMAIL_USER } from "./config.js";
 
-export const sendVerificationEmail = async(to, subject, htmlContent) => {
+export const sendEmail = async(to, subject, htmlContent) => {
   const mailOptions = {
-    from: `"Olympus GYM 💪🏽" <${EMAIL_USER}>`,
+    from: `"Olympus GYM" <${EMAIL_USER}>`,
     to,
     subject,
     html: htmlContent,

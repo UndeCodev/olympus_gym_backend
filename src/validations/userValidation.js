@@ -37,12 +37,21 @@ export const userLoginValidation = checkSchema({
   },
   password: {
     notEmpty: { errorMessage: "La contraseña es obligatoria" },
-    isLength: {
-      options: { min: 12 },
-      errorMessage: "La contraseña debe tener al menos 12 caracteres",
-    },
   },
   tokenCaptcha: {
     notEmpty: { errorMessage: "El token del captcha es obligatorio" },
+  },
+});
+
+export const userChangePassword = checkSchema({
+  email: {
+    notEmpty: { errorMessage: "El email es obligatorio" },
+    isEmail: { errorMessage: "Debe proporcionar un email válido" },
+  },
+  oldPassword: {
+    notEmpty: { errorMessage: "La contraseña actual es obligatoria" },
+  },
+  newPassword: {
+    notEmpty: { errorMessage: "La nueva contraseña es obligatoria" },
   },
 });

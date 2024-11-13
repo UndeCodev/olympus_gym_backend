@@ -10,6 +10,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Module users 
+
 model Usuario {
   id                          Int                           @id @default(autoincrement())
   nombre                      String
@@ -53,6 +55,26 @@ model UsuariosRegistroActividad {
   fecha           DateTime @default(now())
 
   @@map("usuarios_registro_actividad")
+}
+
+
+// Module Admin configuration
+enum TipoEmail {
+  REGISTRO_USUARIO            
+  REENVIO_VERIFICACION_EMAIL  
+  RESTABLECER_CONTRASENA      
+}
+
+model EmailConfigurations {
+  id            Int       @id @default(autoincrement())
+  tipo_email    TipoEmail
+  asunto        String
+  saludo        String
+  mensaje       String
+  texto_boton   String
+  tiempo_expiracion   Int    @default(15)
+
+  @@map("emails_configurations")
 }
 
 model PrivacyPolicy {

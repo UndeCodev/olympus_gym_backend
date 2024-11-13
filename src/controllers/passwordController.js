@@ -5,12 +5,15 @@ export const checkPassword = async (req, res) => {
   
   try {    
     if (!password) {
-      return res.status(400).json({ message: "Password is required" });
+      return res.status(400).json({ message: "La contraseña es obligatoria" });
     }
 
     // Usamos el helper para verificar si la contraseña ha sido comprometida
-    const result = await isPasswordPwned(password);
-    return res.status(200).json(result);
+    const { ok, errorMessage } = await isPasswordPwned(password);
+
+    if(errorMessage) throw new Error(errorMessage);
+
+    return res.status(200).json({ ok });
   } catch (error) {
     console.error('Error al verificar la contraseña:', error);
     return res.status(500).json({ message: 'Error verificando la contraseña' });

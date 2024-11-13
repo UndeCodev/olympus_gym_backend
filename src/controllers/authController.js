@@ -1,10 +1,10 @@
 import jwt from "jsonwebtoken";
-import { authenticator } from "otplib";
 import QRCode from "qrcode";
-import { PrismaClient } from "@prisma/client";
-
 import recaptchaAPI from "../api/recaptchaAPI.js";
 import bcrypt from "bcrypt";
+
+import { authenticator } from "otplib";
+import { PrismaClient } from "@prisma/client";
 
 import {
   BASE_URL,
@@ -15,8 +15,12 @@ import {
 
 const prisma = new PrismaClient();
 
-import { loginAttempts, sendEmailByType, verifyAccountStatus } from "../services/authService.js";
-import { sendVerificationEmail } from "../utils/emailSender.js";
+import {
+  loginAttempts,
+  sendEmailByType,
+  verifyAccountStatus,
+} from "../services/authService.js";
+
 
 export const registerUser = async (req, res) => {
   const { firstname, lastname, phone, birthdate, email, password } = req.body;
@@ -56,41 +60,7 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    // Create token signed for the user
-    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: 900 }); // 15 min to expire
-
-    // URL to verify account
-    const verificationLink = `${BASE_URL}/auth/verificar-email/?token=${token}&email=${email}`;
-
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
-        <h2 style="color: #333;">¡Hola ${userData.nombre || "Usuario"}!</h2>
-        <p style="color: #333; font-size: 16px;">
-          Gracias por registrarte en <strong>Olympus GYM</strong>. Por favor, verifica tu correo electrónico haciendo clic en el enlace de abajo.
-        </p>
-        <p style="text-align: center;">
-          <a href="${verificationLink}" 
-            style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
-            Verificar correo
-          </a>
-        </p>
-        <p style="color: #333; font-size: 16px;">
-          Tienes 15 minutos para completar la verificación antes de que tu token expire.
-        </p>
-        <p style="color: #333; font-size: 16px;">
-          Si no solicitaste esta verificación, simplemente ignora este mensaje.
-        </p>
-        <p style="color: #555; font-size: 14px; text-align: center;">
-          © 2024 Olympus GYM. Todos los derechos reservados.
-        </p>
-      </div>
-    `;
-
-    const isEmailSent = await sendVerificationEmail(
-      email,
-      "Verifica tu correo electrónico",
-      htmlContent
-    );
+    const isEmailSent = await sendEmailByType(newUser.nombre, newUser.email, 'REGISTRO_USUARIO');
 
     if (!isEmailSent) {
       return res.status(500).json({
@@ -152,6 +122,8 @@ export const loginUser = async (req, res) => {
     // Verify details about account like email verified or account blocked
     const accountStatus = await verifyAccountStatus(user_id);
 
+    console.log(accountStatus);
+
     if (accountStatus.statusCode !== 200) {
       return res.status(accountStatus.statusCode).json({
         message: accountStatus.message,
@@ -163,6 +135,7 @@ export const loginUser = async (req, res) => {
       userFound.contrasena
     );
 
+    console.log({ userFound, isPasswordCorrect });
     userFound = structuredClone(userFound);
 
     if (!isPasswordCorrect) {
@@ -228,21 +201,22 @@ export const verifyEmail = async (req, res) => {
   try {
     // Verify token and destruct email
     const { email } = jwt.verify(token, JWT_SECRET);
-    
+
     // Verify if user exists
     const { id: user_id } = await prisma.usuario.findUnique({
       where: { email },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!user_id) {
       return res.status(400).send(`Hubo un problema al encontrar el usuario.`);
     }
 
-    const { id: userIdDetails, email_verificado } = await prisma.usuariosConfiguracionCuenta.findFirst({
-      where: { usuario_id: user_id },
-      select: { id: true, email_verificado: true }
-    })
+    const { id: userIdDetails, email_verificado } =
+      await prisma.usuariosConfiguracionCuenta.findFirst({
+        where: { usuario_id: user_id },
+        select: { id: true, email_verificado: true },
+      });
 
     if (email_verificado) {
       return res.status(400).json({
@@ -254,20 +228,20 @@ export const verifyEmail = async (req, res) => {
     await prisma.usuariosConfiguracionCuenta.update({
       where: { id: userIdDetails },
       data: {
-        email_verificado: true
+        email_verificado: true,
       },
     });
 
     return res.sendStatus(200);
   } catch (err) {
-    if(err.name = 'JsonWebTokenError'){
-      return res.status(403).json({ errorMessage: 'Token expirado' });
+    if ((err.name = "JsonWebTokenError")) {
+      return res.status(403).json({ errorMessage: "Token expirado" });
     }
 
-    if(err.name = 'TokenExpiredError'){
-      return res.status(401).json({ errorMessage: 'Token inválido' });
+    if ((err.name = "TokenExpiredError")) {
+      return res.status(401).json({ errorMessage: "Token inválido" });
     }
-    
+
     return res.status(400).send({
       errorMessage: "Hubo un problema, inténtalo de nuevo.",
     });
@@ -384,72 +358,47 @@ export const resendVerificationEmail = async (req, res) => {
 
   try {
     // Verify user exits
-    const { id: user_id, nombre} = await prisma.usuario.findUnique({ 
+    const userFound = await prisma.usuario.findUnique({
       where: { email },
       select: {
         id: true,
-        nombre: true
-      } 
+        nombre: true,
+      },
     });
 
-    if (!user_id) {
-      return res.status(404).json({ message: "Hubo un problema al encontrar el usuario, vuelve a intentarlo más tarde." });
+
+    if (!userFound) {
+      return res
+        .status(404)
+        .json({
+          message:
+            `El usuario con el correo electrónico ${email} no está registrado.`,
+        });
     }
 
-    const { email_verificado } = await prisma.usuariosConfiguracionCuenta.findFirst({
-      where: { usuario_id: user_id },
-      select: {
-        email_verificado: true
-      }
-    }) 
+    const { email_verificado } =
+      await prisma.usuariosConfiguracionCuenta.findFirst({
+        where: { usuario_id: userFound.id },
+        select: {
+          email_verificado: true,
+        },
+      });
 
     if (email_verificado) {
       return res.status(400).json({
-        message: "El usuario ya está verificado, ya puedes iniciar sesión",
+        message: "El usuario ya está verificado, ahora puedes iniciar sesión",
         isEmailVerified: true,
       });
     }
 
-    // Create token signed for verify email
-    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: 900 });
-
-    // URL to verify account
-    const verificationLink = `${BASE_URL}/auth/verificar-email/?token=${token}&email=${email}`;
-
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
-        <h2 style="color: #333;">¡Hola ${nombre || "Usuario"}!</h2>
-        <p style="color: #333; font-size: 16px;">
-          Gracias por registrarte en <strong>Olympus GYM</strong>. Por favor, verifica tu correo electrónico haciendo clic en el enlace de abajo.
-        </p>
-        <p style="text-align: center;">
-          <a href="${verificationLink}" 
-             style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">
-             Verificar correo
-          </a>
-        </p>
-        <p style="color: #333; font-size: 16px;">
-          Tienes 15 minutos para completar la verificación antes de que tu token expire.
-        </p>
-        <p style="color: #333; font-size: 16px;">
-          Si no solicitaste esta verificación, simplemente ignora este mensaje.
-        </p>
-        <p style="color: #555; font-size: 14px; text-align: center;">
-          © 2024 Olympus GYM. Todos los derechos reservados.
-        </p>
-      </div>
-    `;
-
-    const isEmailSent = await sendVerificationEmail(
-      email,
-      "Verifica tu correo electrónico",
-      htmlContent
-    );
+    const isEmailSent = await sendEmailByType(userFound.nombre, email, 'REENVIO_VERIFICACION_EMAIL');
 
     if (!isEmailSent) {
       return res
         .status(500)
-        .json({ message: "Hubo un problema al enviar el correo de verificación" });
+        .json({
+          message: "Hubo un problema al enviar el correo de verificación, inténtalo de nuevo",
+        });
     }
 
     return res
@@ -465,34 +414,28 @@ export const changePassword = async (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
 
   try {
-    if (!oldPassword || !newPassword || !email) {
-      return res.status(400).json({
-        message: `Todos los campos son necesarios.`,
-      });
-    }
-
     const userFound = await prisma.usuario.findUnique({
       where: { email },
       select: {
         id: true,
-        password: true,
+        contrasena: true,
       },
     });
 
     if (!userFound) {
       return res.status(404).json({
-        message: `El usuario con el correo ${email} no fue encontrado.`,
+        message: `El usuario con el correo electrónico ${email} no fue encontrado.`,
       });
     }
 
     const isPasswordCorrect = await bcrypt.compare(
       oldPassword,
-      userFound.password
+      userFound.contrasena
     );
 
     if (!isPasswordCorrect) {
       return res.status(401).json({
-        message: "Contraseña incorrecta, inténtalo de nuevo.",
+        message: "La contraseña actual es incorrecta, inténtalo de nuevo.",
       });
     }
 
@@ -501,12 +444,10 @@ export const changePassword = async (req, res) => {
 
     await prisma.usuario.update({
       where: { email },
-      data: { password: hashedNewPassword },
+      data: { contrasena: hashedNewPassword },
     });
 
-    return res.status(200).json({
-      message: "La contraseña se actualizó correctamente.",
-    });
+    return res.sendStatus(200);
   } catch (error) {
     console.log(error);
     return res.status(400).json({
@@ -571,12 +512,12 @@ export const sendPasswordResetInstructions = async (req, res) => {
   }
 
   try {
-    const userFound = await prisma.usuario.findUnique({ 
+    const userFound = await prisma.usuario.findUnique({
       where: { email },
       select: {
         id: true,
         nombre: true,
-      } 
+      },
     });
 
     if (!userFound) {
@@ -585,17 +526,12 @@ export const sendPasswordResetInstructions = async (req, res) => {
       });
     }
 
-    const isEmailDispatched = await sendEmailByType(email, 'Verificar correo electrónico', {
-      username: userFound.nombre,
-      message: 'Recibimos una solicitud para restablecer tu contraseña. Haz clic en el enlace de abajo para establecer una nueva contraseña',
-      btnText: 'Restablecer contraseña',
-      expirationMessage: '15 minutos'
-    })
+    const isEmailSent = await sendEmailByType(userFound.nombre, email, 'RESTABLECER_CONTRASENA');
 
-    if (!isEmailDispatched) {
+    if (!isEmailSent) {
       return res.status(500).json({
         message:
-          "Error al enviar el correo electrónico, intenta de nuevo más tarde.",
+          "Hubo un problema al enviar el correo electrónico, intenta de nuevo.",
       });
     }
 
