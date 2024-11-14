@@ -157,12 +157,12 @@ export const sendEmailByType = async(username, email, typeEmail) => {
   const formatTimeToExpire = tiempo_expiracion >= 60 ? `horas` : 'minutos'; 
 
   const routeByTypeEmail = routesAllowed[emailConfig.tipo_email] || routesAllowed.REGISTRO_USUARIO;  
-  const verificationLink = `${BASE_URL}/auth/${routeByTypeEmail}/?token=${token}`;
+  const verificationLink = `${BASE_URL}/auth/${routeByTypeEmail}/?token=${token}&email=${email}`;
 
   // Email content
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd;">
-      <h2 style="color: #333;">${emailConfig.saludo || '¡Hola!'} ${username || ''}</h2>
+      <h2 style="color: #333;">${emailConfig.saludo || '¡Hola!'}${username || ''}</h2>
       <p style="color: #333; font-size: 16px;">
           ${emailConfig.mensaje || 'Gracias por registrarte. Por favor, verifica tu correo electrónico haciendo clic en el enlace de abajo.'}
       </p>

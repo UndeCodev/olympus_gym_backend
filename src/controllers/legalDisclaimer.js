@@ -5,23 +5,22 @@ const prisma = new PrismaClient();
 export const getLegalDisclaimer = async (req, res) => {
   try {
     const legalDisclaimer = await prisma.legalDisclaimer.findMany({
-      orderBy: { status: "desc" }
+      orderBy: { estado: "asc" }
     });
-    res.status(200).json(legalDisclaimer);
+    return res.status(200).json(legalDisclaimer);
   } catch (error) {
-    res.status(500).json({ message: "Error al obtener el descargo legal" });
+    return res.status(500).json({ message: "Error al obtener el descargo legal" });
   }
 };
 
 export const getLegalDisclaimerEnable = async (req, res) => {
   try {
     const privacyPolicy = await prisma.legalDisclaimer.findFirst({
-      where: { status: 'vigente' }
+      where: { estado: "VIGENTE" }
     });
-    res.status(200).json(privacyPolicy);
+    return res.status(200).json(privacyPolicy);
   } catch (error) {
-    console.log(error);
-    res
+    return res
       .status(500)
       .json({ message: "Error al obtener las políticas de privacidad" });
   }
@@ -39,29 +38,29 @@ export const createLegalDisclaimer = async (req, res) => {
   try {
     // Hacer que cualquier versión anterior no sea la versión actual
     await prisma.legalDisclaimer.updateMany({
-      where: { status: "vigente" },
-      data: { status: "no vigente" },
+      where: { estado: "VIGENTE" },
+      data: { estado: "NO_VIGENTE" },
     });
 
     const lastDisclaimer = await prisma.legalDisclaimer.findFirst({
       orderBy: { version: "desc" }, // Ordenar por la versión más alta
     });
 
-    const newVersion = lastDisclaimer ? lastDisclaimer.version + 1.0 : 1.0; // Si existe, incrementar, si no iniciar en 1.0
+    const newVersion = lastDisclaimer ? parseInt(lastDisclaimer.version) + 1.0 : 1.0; // Si existe, incrementar, si no iniciar en 1.0
 
     // Definir el estado según la fecha de vigencia
     const currentDate = new Date();
-    const status = new Date(effectiveDate) > currentDate ? "vigente" : "no vigente";
+    const status = new Date(effectiveDate) > currentDate;
 
     const newLegalDisclaimer = await prisma.legalDisclaimer.create({
       data: {
-        title,
-        content,
-        effectiveDate: new Date(effectiveDate),
+        titulo: title,
+        contenido: content,
+        fecha_vigencia: new Date(effectiveDate),
+        version: newVersion,
+        estado: status ? "VIGENTE" : "NO_VIGENTE",
         createdAt: new Date(),
         updatedAt: new Date(),
-        version: newVersion,
-        status
       },
     });
 
@@ -70,7 +69,6 @@ export const createLegalDisclaimer = async (req, res) => {
       newLegalDisclaimer,
     });
   } catch (error) {
-    console.log(error);
     return res.status(500).json({
       message: "Error al crear el descargo legal. Intenta de nuevo más tarde.",
     });
@@ -90,8 +88,8 @@ export const updateLegalDisclaimer = async (req, res) => {
   try {
     if (isCurrent) {
       await prisma.legalDisclaimer.updateMany({
-        where: { status: "vigente" },
-        data: { status: "no vigente" },
+        where: { estado: "VIGENTE" },
+        data: { estado: "NO_VIGENTE" },
       });
     }
 
@@ -101,7 +99,7 @@ export const updateLegalDisclaimer = async (req, res) => {
     });
 
     if (!currentDisclaimer) {
-      return res.status(404).json({ message: "Descargo legal no encontrado" });
+      return res.status(404).json({ message: "Deslinde legal no encontrado" });
     }
 
     // Lógica para incrementar la versión
@@ -115,25 +113,24 @@ export const updateLegalDisclaimer = async (req, res) => {
       newVersion = `${whole}.${parseInt(decimal) + 1}`;
     }
 
-
     const updatedLegalDisclaimer = await prisma.legalDisclaimer.create({
       data: {
-        title,
-        content,
-        effectiveDate: new Date(effectiveDate),
-        updatedAt: new Date(),
-        status: isCurrent ? 'vigente' : 'no vigente',
+        titulo: title,
+        contenido: content,
+        fecha_vigencia: new Date(effectiveDate),
+        estado: isCurrent ? "VIGENTE" : "NO_VIGENTE",
         version: parseFloat(newVersion),
+        updatedAt: new Date(),
       },
     });
 
-    res.status(200).json({
-      message: "Descargo legal actualizado exitosamente.",
+    return res.status(200).json({
+      message: "Deslinde legal actualizado exitosamente.",
       data: updatedLegalDisclaimer,
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Error al actualizar el descargo legal." });
+    return nres.status(500).json({ message: "Error al actualizar el descargo legal." });
   }
 };
 
@@ -143,14 +140,14 @@ export const deleteLegalDisclaimer = async (req, res) => {
   try {
     const deletedDisclaimer = await prisma.legalDisclaimer.update({
       where: { id: parseInt(id) },
-      data: { status: "eliminada" },
+      data: { estado: "ELIMINADA" },
     });
 
-    res.status(200).json({
-      message: "Descargo legal marcado como eliminado.",
+    return res.status(200).json({
+      message: "Deslinde legal marcado como eliminado.",
       data: deletedDisclaimer,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error al eliminar el descargo legal." });
+    return res.status(500).json({ message: "Error al eliminar el descargo legal." });
   }
 };

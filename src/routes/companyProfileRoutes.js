@@ -1,7 +1,9 @@
 import { Router } from "express";
-import { getCompanyProfile, updateCompanyProfile } from "../controllers/companyProfileController.js";
-
 import fileUpload from "express-fileupload";
+
+import { getCompanyProfile, updateCompanyProfile } from "../controllers/companyProfileController.js";
+import { validateRequest } from "../middlewares/validateRequest.js";
+import { companyProfileRules } from '../validations/companyProfileValidation.js';
 
 const router = Router();
 

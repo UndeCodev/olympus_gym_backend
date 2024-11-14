@@ -5,12 +5,12 @@ const prisma = new PrismaClient();
 export const getPrivacyPolicies = async (req, res) => {
   try {
     const privacyPolicies = await prisma.privacyPolicy.findMany({
-      orderBy: { status: "desc" }
+      orderBy: { estado: "asc" }
     });
-    res.status(200).json(privacyPolicies);
+    return res.status(200).json(privacyPolicies);
   } catch (error) {
     console.log(error);
-    res
+    return res
       .status(500)
       .json({ message: "Error al obtener las políticas de privacidad" });
   }
@@ -19,12 +19,11 @@ export const getPrivacyPolicies = async (req, res) => {
 export const getPrivacyEnable = async (req, res) => {
   try {
     const privacyPolicy = await prisma.privacyPolicy.findFirst({
-      where: { status: 'vigente' }
+      where: { estado: 'VIGENTE' }
     });
-    res.status(200).json(privacyPolicy);
+    return res.status(200).json(privacyPolicy);
   } catch (error) {
-    console.log(error);
-    res
+    return res
       .status(500)
       .json({ message: "Error al obtener las políticas de privacidad" });
   }
@@ -42,30 +41,29 @@ export const createPrivacyPolicy = async (req, res) => {
   try {
     // Hacer que cualquier versión anterior no sea la versión actual
     await prisma.privacyPolicy.updateMany({
-      where: { status: "vigente" },
-      data: { status: "no vigente" },
+      where: { estado: "VIGENTE" },
+      data: { estado: "NO_VIGENTE" },
     });
 
     const lastPolicy = await prisma.privacyPolicy.findFirst({
       orderBy: { version: "desc" }, // Ordenar por la versión más alta
     });
 
-    const newVersion = lastPolicy ? lastPolicy.version + 1.0 : 1.0; // Si existe, incrementar, si no iniciar en 1.0
+    const newVersion = lastPolicy ? parseInt(lastPolicy.version) + 1.0 : 1.0; // Si existe, incrementar, si no iniciar en 1.0
 
     // Definir el estado según la fecha de vigencia
     const currentDate = new Date();
-
-    const status = new Date(effectiveDate) > currentDate ? "vigente" : "no vigente";
+    const status = new Date(effectiveDate) > currentDate;
 
     const newPrivacyPolicy = await prisma.privacyPolicy.create({
       data: {
-        title,
-        content,
-        effectiveDate: new Date(effectiveDate),
+        titulo: title,
+        contenido: content,
+        fecha_vigencia: new Date(effectiveDate),
+        estado: status ? "VIGENTE" : "NO_VIGENTE",
+        version: newVersion,
         createdAt: new Date(),
         updatedAt: new Date(),
-        version: newVersion,
-        status
       },
     });
 
@@ -95,10 +93,11 @@ export const updatePrivacyPolicy = async (req, res) => {
   }
 
   try {
+
     if(isCurrent){
       await prisma.privacyPolicy.updateMany({
-        where: { status: "vigente" },
-        data: { status: "no vigente" },
+        where: { estado: "VIGENTE" },
+        data: { estado: "NO_VIGENTE" },
       });
     }
     
@@ -113,17 +112,30 @@ export const updatePrivacyPolicy = async (req, res) => {
         .json({ message: "Política de privacidad no encontrada" });
     }
 
+    // Lógica para incrementar la versión
+    let newVersion;
+
+    if (Math.floor(currentPolicy.version) === currentPolicy.version) {
+      // Si la versión es un número entero (por ejemplo, "3"), añadir ".1"
+      newVersion = currentPolicy.version + 0.1;
+    } else {
+      // Si ya tiene una parte decimal (por ejemplo, "3.1"), incrementar el decimal
+      const [whole, decimal] = currentPolicy.version.toString().split('.');
+      newVersion = `${whole}.${parseInt(decimal) + 1}`;
+    }
+
     const updatedPrivacyPolicy = await prisma.privacyPolicy.create({
       data: {
-        title,
-        content,
-        effectiveDate: new Date(effectiveDate),
+        titulo: title,
+        contenido: content,
+        fecha_vigencia: new Date(effectiveDate),
         updatedAt: new Date(),
-        status: isCurrent ? 'vigente' : 'no vigente'
+        estado: isCurrent ? "VIGENTE" : "NO_VIGENTE",
+        version: parseFloat(newVersion)
       },
     });
 
-    res
+    return res
       .status(200)
       .json({
         message: "Política de privacidad actualizada exitosamente.",
@@ -131,7 +143,7 @@ export const updatePrivacyPolicy = async (req, res) => {
       });
   } catch (error) {
     console.log(error);
-    res
+    return res
       .status(500)
       .json({ message: "Error al actualizar la política de privacidad." });
   }
@@ -143,14 +155,15 @@ export const deletePrivacyPolicy = async (req, res) => {
   try {
     const deletedPolicy = await prisma.privacyPolicy.update({
       where: { id: parseInt(id) },
-      data: { status: "eliminada" },
+      data: { estado: "ELIMINADA" },
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Política de privacidad marcada como eliminada.",
       data: deletedPolicy,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error al eliminar la política de privacidad." });
+    console.log(error);
+    return res.status(500).json({ message: "Error al eliminar la política de privacidad." });
   }
 };

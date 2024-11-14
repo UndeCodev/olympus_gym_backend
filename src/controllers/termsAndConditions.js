@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 export const getTermsAndConditions = async (req, res) => {
   try {
     const termsAndConditions = await prisma.termsAndConditions.findMany({
-      orderBy: { status: "desc" }
+      orderBy: { estado: "asc" }
     });
     res.status(200).json(termsAndConditions);
   } catch (error) {
@@ -16,7 +16,13 @@ export const getTermsAndConditions = async (req, res) => {
 export const getTermsEnable = async (req, res) => {
   try {
     const termsAndConditions = await prisma.termsAndConditions.findFirst({
-      where: { status: 'vigente' }
+      where: { estado: "VIGENTE" },
+      select: {
+        titulo: true,
+        contenido: true,
+        fecha_vigencia: true,
+        updatedAt: true
+      }
     });
     res.status(200).json(termsAndConditions);
   } catch (error) {
@@ -31,8 +37,6 @@ export const getTermsEnable = async (req, res) => {
 export const createTermsAndConditions = async (req, res) => {
   const { title, content, effectiveDate } = req.body;
 
-  console.log(req.body);
-  
   if (!title || !content || !effectiveDate) {
     return res.status(400).json({
       message: "Todos los campos son obligatorios",
@@ -42,29 +46,29 @@ export const createTermsAndConditions = async (req, res) => {
   try {
     // Hacer que cualquier versión anterior no sea la versión actual
     await prisma.termsAndConditions.updateMany({
-      where: { status: "vigente" },
-      data: { status: "no vigente" },
+      where: { estado: "VIGENTE" },
+      data: { estado: "NO_VIGENTE" },
     });
 
     const lastTerms = await prisma.termsAndConditions.findFirst({
       orderBy: { version: "desc" }, // Ordenar por la versión más alta
     });
 
-    const newVersion = lastTerms ? lastTerms.version + 1.0 : 1.0; // Si existe, incrementar, si no iniciar en 1.0
+    const newVersion = lastTerms ? parseInt(lastTerms.version) + 1.0 : 1.0; // Si existe, incrementar, si no iniciar en 1.0
 
     // Definir el estado según la fecha de vigencia
     const currentDate = new Date();
-    const status = new Date(effectiveDate) > currentDate ? "vigente" : "no vigente";
+    const status = new Date(effectiveDate) > currentDate;
 
     const newTermsAndConditions = await prisma.termsAndConditions.create({
       data: {
-        title,
-        content,
-        effectiveDate: new Date(effectiveDate),
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        titulo: title,
+        contenido: content,
+        fecha_vigencia: new Date(effectiveDate),
         version: newVersion,
-        status
+        estado: status ? 'VIGENTE' : 'NO_VIGENTE',
+        updatedAt: new Date(),
+        createdAt: new Date(),
       },
     });
 
@@ -75,7 +79,7 @@ export const createTermsAndConditions = async (req, res) => {
   } catch (error) {
     console.log(error);
     return res.status(500).json({
-      message: "Error al crear los términos y condiciones. Intenta de nuevo más tarde.",
+      message: "Hubo un problema al crear los términos y condiciones. Intenta de nuevo más tarde.",
     });
   }
 };
@@ -93,8 +97,8 @@ export const updateTermsAndConditions = async (req, res) => {
   try {
     if(isCurrent){
       await prisma.termsAndConditions.updateMany({
-        where: { status: "vigente" },
-        data: { status: "no vigente" },
+        where: { estado: "VIGENTE" },
+        data: { estado: "NO_VIGENTE" },
       });
     }
     
@@ -118,15 +122,14 @@ export const updateTermsAndConditions = async (req, res) => {
       newVersion = `${whole}.${parseInt(decimal) + 1}`;
     }
 
-    const updatedTermsAndConditions = await prisma.termsAndConditions.update({
-      where: { id: parseInt(id) },
+    const updatedTermsAndConditions = await prisma.termsAndConditions.create({
       data: {
-        title,
-        content,
-        effectiveDate: new Date(effectiveDate),
+        titulo: title,
+        contenido: content,
+        version: parseFloat(newVersion),
+        estado: isCurrent ? "VIGENTE" : "NO_VIGENTE",
+        fecha_vigencia: new Date(effectiveDate),
         updatedAt: new Date(),
-        newVersion,
-        status: isCurrent ? 'vigente' : 'no vigente'
       },
     });
 
@@ -146,7 +149,7 @@ export const deleteTermsAndConditions = async (req, res) => {
   try {
     const deletedTerms = await prisma.termsAndConditions.update({
       where: { id: parseInt(id) },
-      data: { status: "eliminada" },
+      data: { estado: "ELIMINADA" },
     });
 
     res.status(200).json({

@@ -55,3 +55,15 @@ export const userChangePassword = checkSchema({
     notEmpty: { errorMessage: "La nueva contraseña es obligatoria" },
   },
 });
+
+
+export const toggleMFA = checkSchema({
+  email: {
+    notEmpty: { errorMessage: "El email es obligatorio" },
+    isEmail: { errorMessage: "Debe proporcionar un email válido" },
+  },
+  mfaState: {
+    notEmpty: { errorMessage: "El valor de mfaState es obligatorio" },
+    isBoolean: { errorMessage: "El valor de mfaState debe ser un boolean" }
+  },
+});

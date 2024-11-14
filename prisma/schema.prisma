@@ -77,55 +77,62 @@ model EmailConfigurations {
   @@map("emails_configurations")
 }
 
+model CompanyProfile {
+  id                 Int      @id @default(autoincrement())
+  logo_url           String?   
+  logo_min_url       String?  
+  titulo_sitio       String   
+  eslogan            String   
+  email              String   
+  numero_contacto    String   
+  direccion          Json?   
+  redes_sociales     Json?    
+
+  @@map("perfil_empresa")
+}
+
+enum EstadoVigencia {
+  VIGENTE
+  NO_VIGENTE
+  ELIMINADA
+}
+
 model PrivacyPolicy {
-  id            Int       @id @default(autoincrement())
-  title         String
-  content       String
-  effectiveDate DateTime
-  createdAt     DateTime?
-  updatedAt     DateTime?
-  version       Float?
-  status        String    @default("vigente") // Nuevo campo para el estado
+  id              Int       @id @default(autoincrement())
+  titulo          String
+  contenido       String
+  fecha_vigencia  DateTime
+  createdAt       DateTime?
+  updatedAt       DateTime?
+  version         Float?
+  estado          EstadoVigencia
+
+  @@map("politicas_privacidad")
 }
 
 model TermsAndConditions {
-  id            Int       @id @default(autoincrement())
-  title         String
-  content       String
-  effectiveDate DateTime
-  createdAt     DateTime?
-  updatedAt     DateTime?
-  version       Float?
-  status        String    @default("vigente") // Nuevo campo para el estado
+  id              Int       @id @default(autoincrement())
+  titulo          String
+  contenido       String
+  fecha_vigencia  DateTime
+  version         Float?
+  estado          EstadoVigencia
+  createdAt       DateTime?
+  updatedAt       DateTime?
+  
+  @@map("terminos_y_condiciones")
 }
 
 model LegalDisclaimer {
-  id            Int       @id @default(autoincrement())
-  title         String
-  content       String
-  effectiveDate DateTime
-  createdAt     DateTime?
-  updatedAt     DateTime?
-  version       Float?
-  status        String    @default("vigente") // Nuevo campo para el estado
+  id              Int       @id @default(autoincrement())
+  titulo          String
+  contenido       String
+  fecha_vigencia  DateTime
+  version         Float?
+  estado          EstadoVigencia
+  createdAt       DateTime?
+  updatedAt       DateTime?
+
+  @@map("deslindes_legales") 
 }
 
-model CompanyProfile {
-  id                 Int      @id @default(autoincrement())
-  logo_url           String   @map("logo_url") @db.VarChar(500)
-  thumbnail_logo_url String?  @map("thumbnail_logo_url") @db.VarChar(500)
-  page_title         String   @map("page_title") @db.VarChar(60)
-  slogan             String   @map("slogan") @db.VarChar(100)
-  address            String   @map("address") @db.VarChar(255)
-  city               String   @map("city") @db.VarChar(100)
-  state              String   @map("state") @db.VarChar(100)
-  postal_code        String   @map("postal_code") @db.VarChar(10)
-  country            String   @default("México") @map("country") @db.VarChar(100)
-  email              String   @map("email") @db.VarChar(255)
-  phone_number       String   @map("phone_number") @db.VarChar(10)
-  social             Json?    @map("social")
-  created_at         DateTime @default(now()) @map("created_at")
-  updated_at         DateTime @updatedAt @map("updated_at")
-
-  @@map("companyProfile")
-}

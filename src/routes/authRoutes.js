@@ -16,7 +16,7 @@ import {
 import { checkPassword } from '../controllers/passwordController.js';
 
 import { validateRequest } from '../middlewares/validateRequest.js';
-import { userChangePassword, userLoginValidation, userRegistrationValidation } from "../validations/userValidation.js";
+import { toggleMFA, userChangePassword, userLoginValidation, userRegistrationValidation } from "../validations/userValidation.js";
 
 const router = Router();
 
@@ -31,7 +31,7 @@ router.put("/verify-email", verifyEmail);
 
 
 router.post("/mfa/setup", mfaSetup);
-router.put("/mfa/enable", enableMFA);
+router.put("/mfa/enable", toggleMFA, validateRequest, enableMFA);
 router.post("/mfa/verify", mfaVerify);
 
 // resend a verification email

@@ -80,7 +80,6 @@ export const registerUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error);
     res.status(400).json({
       message: "Hubo un problema al registrar el usuario, inténtalo de nuevo.",
       error: error.message,
@@ -109,20 +108,20 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    let { id: user_id, ...userFound } = await prisma.usuario.findUnique({
+    let userExists = await prisma.usuario.findUnique({
       where: { email },
     });
 
-    if (!userFound) {
+    if (!userExists) {
       return res.status(404).json({
         message: `El correo electrónico ${email} no está registrado.`,
       });
     }
 
+    let { id: user_id, ...userFound } = userExists;
+
     // Verify details about account like email verified or account blocked
     const accountStatus = await verifyAccountStatus(user_id);
-
-    console.log(accountStatus);
 
     if (accountStatus.statusCode !== 200) {
       return res.status(accountStatus.statusCode).json({
@@ -135,7 +134,6 @@ export const loginUser = async (req, res) => {
       userFound.contrasena
     );
 
-    console.log({ userFound, isPasswordCorrect });
     userFound = structuredClone(userFound);
 
     if (!isPasswordCorrect) {
@@ -161,6 +159,13 @@ export const loginUser = async (req, res) => {
 
     delete userFound.password;
 
+    const userDetails = await prisma.usuariosConfiguracionCuenta.findFirst({
+      where: { usuario_id: user_id },
+      select: {
+        autenticacion_doble_factor: true
+      }
+    });
+
     const user = {
       id: user_id,
       nombre: userFound.nombre,
@@ -169,6 +174,7 @@ export const loginUser = async (req, res) => {
       telefono: userFound.telefono,
       email: userFound.email,
       rol: userFound.rol,
+      hasMFA: userDetails.autenticacion_doble_factor
     };
 
     const token = jwt.sign(
@@ -182,7 +188,6 @@ export const loginUser = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.log(error);
     return res.status(500).json({
       message: error.message,
     });
@@ -194,7 +199,7 @@ export const verifyEmail = async (req, res) => {
 
   if (!token) {
     return res.status(400).json({
-      message: "No se proporcionó ningún token",
+      message: "El token es obligatorio.",
     });
   }
 
@@ -265,7 +270,6 @@ export const mfaSetup = async (req, res) => {
 
     // Enviar el secreto y el código QR como respuesta
     res.json({
-      secret: MFA_SECRET,
       qrCode: qrCode,
     });
   } catch (err) {
@@ -278,7 +282,7 @@ export const mfaSetup = async (req, res) => {
 export const mfaVerify = async (req, res) => {
   const { token, secret } = req.body;
 
-  const isValid = authenticator.verify({ token, secret });
+  const isValid = authenticator.verify({ token, secret });  
 
   if (isValid) {
     return res.json({
@@ -293,25 +297,35 @@ export const mfaVerify = async (req, res) => {
 };
 
 export const enableMFA = async (req, res) => {
-  const { userId, mfaState } = req.body;
-
-  if (!userId) {
-    return res.status(400).json({
-      message: "Todos los campos son obligatorios",
-    });
-  }
-
+  const { email, mfaState } = req.body;
+  
   try {
-    // Actualiza el campo hasMFAEnable en la tabla usuarios
-    await prisma.usuario.update({
-      where: { id: userId }, // Asume que "id" es el campo primario en la tabla usuarios
-      data: { hasMFA: mfaState },
+    const userFound = await prisma.usuario.findUnique({
+      where: { email },
+      select: {
+        id: true,
+      }
     });
 
-    return res.sendStatus(200);
+    if(!userFound){
+      return res.status(404).json({
+        message: `El usuario con el ecorreo electrónico ${email} no fue encontrado.`
+      });
+    }
+
+    await prisma.usuariosConfiguracionCuenta.updateMany({
+      where: { usuario_id: userFound.id },
+      data: {
+        autenticacion_doble_factor: mfaState
+      }
+    })
+
+    return res.sendStatus(200)
   } catch (error) {
-    console.error("Error activando MFA:", error);
-    return res.status(500).json({ message: "Error al activar MFA" });
+    console.log(error);
+    return res.status(500).json({
+      mesage: 'Hubo un problema al activar la autenticación de 2 pasos, inténtalo de nuevo.'
+    });
   }
 };
 
@@ -366,7 +380,6 @@ export const resendVerificationEmail = async (req, res) => {
       },
     });
 
-
     if (!userFound) {
       return res
         .status(404)
@@ -405,8 +418,8 @@ export const resendVerificationEmail = async (req, res) => {
       .status(200)
       .json({ message: "Correo de verificación reenviado correctamente." });
   } catch (error) {
-    console.log(error);
     return res.status(500).json({ message: "Error al reenviar el correo" });
+
   }
 };
 
@@ -449,9 +462,8 @@ export const changePassword = async (req, res) => {
 
     return res.sendStatus(200);
   } catch (error) {
-    console.log(error);
-    return res.status(400).json({
-      message: "Algo salió mal",
+    return res.status(500).json({
+      message: "Hubo un problema al hacer la solicitud, inténtalo de nuevo.",
     });
   }
 };
@@ -481,14 +493,13 @@ export const resetPassword = async (req, res) => {
 
     await prisma.usuario.update({
       where: { email },
-      data: { password: hashedNewPassword },
+      data: { contrasena: hashedNewPassword },
     });
 
     return res.status(200).json({
       message: "La contraseña se actualizó correctamente.",
     });
   } catch (error) {
-    console.log(error);
     if (error instanceof jwt.TokenExpiredError)
       return res.status(403).json({ message: "El token ha expirado" });
     if (error instanceof jwt.JsonWebTokenError)
